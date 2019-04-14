@@ -60,6 +60,7 @@ REGISTER_OP("NGraphEncapsulate")
     .Output("results: Tresults")
     .Attr("Tresults: list(type) >= 0")
     .Attr("ngraph_cluster: int")
+    .Attr("ngraph_graph_id: int")
     .SetIsStateful()
     .Doc("nGraph Encapsulation Op. For use by the nGraph JIT only.");
 
@@ -155,6 +156,7 @@ class NGraphEncapsulateOp : public OpKernel {
     std::ostringstream oss;
     oss << "Destroy Encapsulate_" << my_instance_id << ": " << name();
     ngraph::Event event(oss.str(), name(), "");
+    NGRAPH_VLOG(2) << "~NGraphEncapsulateOp::" << name();
 
     // If the kernel goes away, we must de-register all of its cached
     // functions
@@ -167,11 +169,10 @@ class NGraphEncapsulateOp : public OpKernel {
       // TODO(amprocte): We should be able to unref the tracker here, but it
       // seems to screw things up in the C++ unit tests.
       // m_freshness_tracker->Unref();
-
-      // Release the backend
-      BackendManager::ReleaseBackend(m_op_backend_name);
-      NGRAPH_VLOG(2) << "~NGraphEncapsulateOp()";
     }
+    // Release the backend
+    NGRAPH_VLOG(2) << "~NGraphEncapsulateOp():: ReleaseBackend";
+    BackendManager::ReleaseBackend(m_op_backend_name);
     event.Stop();
     ngraph::Event::write_trace(event);
   }
@@ -396,6 +397,7 @@ class NGraphEncapsulateOp : public OpKernel {
       }
       BackendManager::UnlockBackend(m_op_backend_name);
       event_compile.Stop();
+      ngraph::Event::write_trace(event_compile);
 
       m_ng_exec_map[signature] = ng_exec;
       // caching ng_function to serialize to ngraph if needed
